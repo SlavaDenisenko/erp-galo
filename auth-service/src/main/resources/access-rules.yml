@@ -1,0 +1,292 @@
+access:
+  rules:
+    - path: /roles
+      method: POST
+      roles:
+        - manager
+        - director
+    - path: /roles
+      method: GET
+      roles:
+        - manager
+        - director
+    - path: /roles/{id}
+      method: PUT
+      roles:
+        - manager
+        - director
+    - path: /roles/{id}
+      method: DELETE
+      roles:
+        - director
+    - path: /users
+      method: POST
+      roles:
+        - manager
+        - director
+    - path: /users
+      method: GET
+      roles:
+        - manager
+        - director
+    - path: /users/{id}
+      method: GET
+      roles:
+        - manager
+        - director
+    - path: /users/{id}
+      method: PUT
+      roles:
+        - manager
+        - director
+    - path: /users/{id}
+      method: DELETE
+      roles:
+        - director
+    - path: /user-roles/{userId}/assign/{roleId}
+      method: PUT
+      roles:
+        - manager
+        - director
+    - path: /user-roles/{userId}/remove/{roleId}
+      method: DELETE
+      roles:
+        - director
+    - path: /categories
+      method: POST
+      roles:
+        - accountant
+        - director
+    - path: /categories
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /categories/{id}
+      method: PUT
+      roles:
+        - accountant
+        - director
+    - path: /categories/{id}
+      method: DELETE
+      roles:
+        - accountant
+        - director
+    - path: /ingredients
+      method: POST
+      roles:
+        - accountant
+    - path: /ingredients
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /ingredients/{id}
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /ingredients/{id}
+      method: PUT
+      roles:
+        - accountant
+    - path: /ingredients/{id}
+      method: DELETE
+      roles:
+        - accountant
+    - path: /recipes
+      method: POST
+      roles:
+        - accountant
+        - director
+        - manager
+    - path: /recipes
+      method: GET
+      roles:
+        - accountant
+        - director
+        - manager
+    - path: /recipes/{id}
+      method: GET
+      roles:
+        - accountant
+        - director
+        - manager
+    - path: /recipes/{id}
+      method: PUT
+      roles:
+        - accountant
+        - director
+        - manager
+    - path: /recipes/{id}
+      method: DELETE
+      roles:
+        - accountant
+        - director
+        - manager
+    - path: /documents
+      method: POST
+      roles:
+        - accountant
+    - path: /documents
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /documents/{id}
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /inventory
+      method: POST
+      roles:
+        - accountant
+        - director
+    - path: /inventory/snapshot
+      method: POST
+      roles:
+        - accountant
+        - director
+    - path: /menu
+      method: GET
+      roles:
+        - accountant
+        - director
+        - manager
+        - waiter
+    - path: /orders
+      method: POST
+      roles:
+        - director
+        - manager
+        - waiter
+    - path: /orders
+      method: GET
+      roles:
+        - accountant
+        - director
+        - manager
+        - waiter
+    - path: /orders/closed
+      method: GET
+      roles:
+        - accountant
+        - director
+        - manager
+    - path: /orders/{id}
+      method: GET
+      roles:
+        - accountant
+        - director
+        - manager
+    - path: /orders/{id}/close
+      method: POST
+      roles:
+        - director
+        - manager
+    - path: /orders/{id}/items
+      method: POST
+      roles:
+        - director
+        - manager
+        - waiter
+    - path: /orders/{id}/items
+      method: DELETE
+      roles:
+        - director
+        - manager
+    - path: /orders/{id}/check
+      method: POST
+      roles:
+        - director
+        - manager
+        - waiter
+    - path: /reports/templates
+      method: POST
+      roles:
+        - accountant
+        - director
+    - path: /reports/templates
+      method: GET
+      roles:
+        - accountant
+    - path: /reports
+      method: POST
+      roles:
+        - accountant
+        - director
+    - path: /mappings
+      method: POST
+      roles:
+        - accountant
+    - path: /suppliers/orders
+      method: POST
+      roles:
+        - accountant
+    - path: /suppliers/orders
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /suppliers/orders/{id}
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /suppliers/orders/{id}
+      method: PUT
+      roles:
+        - accountant
+    - path: /suppliers/orders/{id}/send
+      method: POST
+      roles:
+        - accountant
+    - path: /suppliers
+      method: POST
+      roles:
+        - accountant
+    - path: /suppliers
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /suppliers/{id}
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /suppliers/{id}
+      method: PUT
+      roles:
+        - accountant
+    - path: /supplies
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /supplies/{id}
+      method: GET
+      roles:
+        - accountant
+        - director
+    - path: /supplies/{id}/accept
+      method: POST
+      roles:
+        - accountant
+    - path: /fiscal/shift/open
+      method: POST
+      roles:
+        - director
+        - manager
+    - path: /fiscal/shift/close
+      method: POST
+      roles:
+        - director
+        - manager
+    - path: /reports
+      method: GET
+      roles:
+        - accountant
+        - director
+        - manager
