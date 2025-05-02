@@ -1,0 +1,47 @@
+{
+  "type": "record",
+  "name": "RecipeUpdatedEvent",
+  "namespace": "com.denisenko.events",
+  "fields": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "name",
+      "type": "string"
+    },
+    {
+      "name": "description",
+      "type": ["null", "string"],
+      "default": null
+    },
+    {
+      "name": "categoryId",
+      "type": "int"
+    },
+    {
+      "name": "preparationTime",
+      "type": ["null", "int"],
+      "default": null
+    },
+    {
+      "name": "price",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      }
+    },
+    {
+      "name": "instructions",
+      "type": ["null", "string"],
+      "default": null
+    },
+    {
+      "name": "location",
+      "type": "string"
+    }
+  ]
+}

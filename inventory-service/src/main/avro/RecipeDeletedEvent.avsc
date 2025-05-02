@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "RecipeDeletedEvent",
+  "namespace": "com.denisenko.events",
+  "fields": [
+    {
+      "name": "id",
+      "type": "int"
+    }
+  ]
+}

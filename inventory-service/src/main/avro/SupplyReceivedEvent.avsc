@@ -1,0 +1,58 @@
+{
+  "type": "record",
+  "name": "SupplyReceivedEvent",
+  "namespace": "com.denisenko.events",
+  "fields": [
+    {
+      "name": "documentNumber",
+      "type": "string"
+    },
+    {
+      "name": "documentDate",
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      }
+    },
+    {
+      "name": "acceptedDate",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "supplierName",
+      "type": "string"
+    },
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "SupplyReceivedItem",
+          "fields": [
+            {
+              "name": "ingredientId",
+              "type": "int"
+            },
+            {
+              "name": "quantity",
+              "type": "double"
+            },
+            {
+              "name": "cost",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "type": "record",
+  "name": "CategoryUpdatedEvent",
+  "namespace": "com.denisenko.events",
+  "fields": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "name",
+      "type": "string"
+    },
+    {
+      "name": "description",
+      "type": ["null", "string"],
+      "default": null
+    },
+    {
+      "name": "parentCategoryId",
+      "type": ["null", "int"],
+      "default": null
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "type": "record",
+  "name": "OrderClosedEvent",
+  "namespace": "com.denisenko.events",
+  "fields": [
+    {
+      "name": "tableNumber",
+      "type": "double"
+    },
+    {
+      "name": "numberOfGuests",
+      "type": "int"
+    },
+    {
+      "name": "createdAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "closedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "totalPrice",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      }
+    },
+    {
+      "name": "waiterName",
+      "type": "string"
+    },
+    {
+      "name": "paymentMethod",
+      "type": "string"
+    },
+    {
+      "name": "ofdNumber",
+      "type": "string"
+    },
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "OrderClosedItem",
+          "fields": [
+            {
+              "name": "itemId",
+              "type": "int"
+            },
+            {
+              "name": "itemName",
+              "type": "string"
+            },
+            {
+              "name": "price",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              }
+            },
+            {
+              "name": "quantity",
+              "type": "double"
+            },
+            {
+              "name": "course",
+              "type": "int"
+            },
+            {
+              "name": "status",
+              "type": {
+                "type": "enum",
+                "name": "OrderItemStatus",
+                "symbols": ["ACTIVE", "DELETED"]
+              }
+            },
+            {
+              "name": "reasonForDeletion",
+              "type": ["null", "string"],
+              "default": null
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
