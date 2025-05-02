@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "name": "ShiftClosedEvent",
+  "namespace": "com.denisenko.events",
+  "fields": [
+    {
+      "name": "ofdShiftNumber",
+      "type": "string"
+    },
+    {
+      "name": "startTime",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "endTime",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "openedBy",
+      "type": "string"
+    },
+    {
+      "name": "closedBy",
+      "type": "string"
+    }
+  ]
+}

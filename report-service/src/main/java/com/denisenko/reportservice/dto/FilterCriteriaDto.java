@@ -1,0 +1,16 @@
+package com.denisenko.reportservice.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class FilterCriteriaDto {
+    private String field;
+    private String operator;
+    private String value;
+}

@@ -1,0 +1,22 @@
+{
+  "type": "record",
+  "name": "ShiftOpenedEvent",
+  "namespace": "com.denisenko.events",
+  "fields": [
+    {
+      "name": "ofdShiftNumber",
+      "type": "string"
+    },
+    {
+      "name": "startTime",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "openedBy",
+      "type": "string"
+    }
+  ]
+}
