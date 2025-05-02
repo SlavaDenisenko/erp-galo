@@ -1,0 +1,66 @@
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+  kafka:
+    bootstrap-servers: ${BOOTSTRAP_SERVERS}
+    topics:
+      recipe-updated: ${KAFKA_TOPIC_RECIPE_UPDATED}
+      recipe-deleted: ${KAFKA_TOPIC_RECIPE_DELETED}
+      category-updated: ${KAFKA_TOPIC_CATEGORY_UPDATED}
+      category-deleted: ${KAFKA_TOPIC_CATEGORY_DELETED}
+      order-closed: ${KAFKA_TOPIC_ORDER_CLOSED}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.apicurio.registry.serde.avro.AvroKafkaSerializer
+      properties:
+        apicurio.registry.url: ${SCHEMA_REGISTRY_URL}
+        apicurio.registry.auto-register: true
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: io.apicurio.registry.serde.avro.AvroKafkaDeserializer
+      group-id: ${KAFKA_GROUP_ID}
+      properties:
+        apicurio.registry.url: ${SCHEMA_REGISTRY_URL}
+        apicurio.registry.auto-register: true
+        apicurio.registry.use-specific-avro-reader: true
+        spring:
+          json:
+            trusted:
+              packages: "*"
+        auto-offset-reset: earliest
+
+print-service:
+  url: ${PRINT_SERVICE_URL}
+
+fiscal-service:
+  url: ${FISCAL_SERVICE_URL}
+
+inventory-service:
+  url: ${INVENTORY_SERVICE_URL}
+
+feign:
+  retry:
+    maxAttempts: ${FEIGN_RETRY_MAX_ATTEMPTS}
+    delay: ${FEIGN_RETRY_DELAY}
+
+server:
+  port: ${SERVER_PORT}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true # /actuator/health/liveness
+    readinessstate:
+      enabled: true # /actuator/health/readiness
+    redis:
+      enabled: true

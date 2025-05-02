@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "CategoryDeletedEvent",
+  "namespace": "com.denisenko.events",
+  "fields": [
+    {
+      "name": "id",
+      "type": "int"
+    }
+  ]
+}
