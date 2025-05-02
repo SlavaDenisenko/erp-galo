@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+<h1>{type} Shift</h1>
+<p>Shift #: {shift.ofdShiftNumber}</p>
+<p>Opened by: {shift.openedBy}</p>
+<p>Timestamp (open): {shift.startTime}</p>
+{#if shift.closedBy}
+<p>Closed by: {shift.closedBy}</p>
+{/if}
+{#if shift.endTime}
+<p>Timestamp (close): {shift.endTime}</p>
+{/if}
+</body>
+</html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+<h1>Fiscal Receipt</h1>
+<p>OFD Receipt #: {order.ofdNumber}</p>
+<p>Date: {order.createdAt}</p>
+<p>Payment method: {order.paymentMethod}</p>
+
+<ul>
+    {#for item in order.items}
+        <li>{item.itemName} x {item.quantity} = {item.quantity.multiply(item.price)}</li>
+    {/for}
+</ul>
+<p>Total price: {order.totalPrice}</p>
+</body>
+</html>

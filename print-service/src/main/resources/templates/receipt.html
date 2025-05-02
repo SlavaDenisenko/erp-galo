@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+<h1>Receipt</h1>
+<p>Waiter: {order.waiterName}</p>
+<p>Created at: {order.createdAt}</p>
+
+{#for course in courses}
+    <h3>Course {course.number}</h3>
+    <ul>
+    {#for item in course.items}
+        <li>{item.itemName} --- {item.quantity}</li>
+    {/for}
+    </ul>
+{/for}
+</body>
+</html>

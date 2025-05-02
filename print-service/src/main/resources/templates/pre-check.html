@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+<h1>Pre-check</h1>
+<p>Table number: {order.tableNumber}</p>
+<p>Number of guests: {order.numberOfGuests}</p>
+<p>Waiter: {order.waiterName}</p>
+<p>Created at: {order.createdAt}</p>
+
+<ul>
+    {#for item in order.items}
+        <li>{item.itemName} x {item.quantity} = {item.quantity.multiply(item.price)}</li>
+    {/for}
+</ul>
+<p>Total price: {order.totalPrice}</p>
+</body>
+</html>
