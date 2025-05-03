@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -56,7 +57,7 @@ public class SupplyOrderService {
                 .map(id -> new ProductPlanningContext(
                         id,
                         stocks.getOrDefault(id, 0.0),
-                        sales.getOrDefault(id, List.of())
+                        Optional.ofNullable(sales).orElse(Map.of()).getOrDefault(id, List.of())
                 ))
                 .toList();
     }

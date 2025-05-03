@@ -46,7 +46,7 @@ public class OrderService {
         SupplierOrder order = supplierOrderMapper.toEntity(supplierOrderDto);
         order.setItems(new ArrayList<>(order.getItems()));
         supplierOrderRepository.save(order);
-        log.info("Order for supplier '{}' is saved with ID = {}", order.getSupplier().getName(), order.getId());
+        log.info("Order for supplier [{}] is saved with ID = {}", order.getSupplier().getId(), order.getId());
         redisTemplate.opsForValue().set(IDEMPOTENCY_PREFIX + idempotencyKey, String.valueOf(order.getId()), Duration.ofMinutes(10));
         return supplierOrderMapper.toDTO(order);
     }

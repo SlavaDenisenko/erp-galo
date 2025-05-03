@@ -37,6 +37,11 @@ public class KafkaConsumerService {
         requestLog.setStatus(RECEIVED);
         requestService.saveAll(List.of(requestLog));
 
+        if (event.getOrderedQuantities().isEmpty()) {
+            log.info("Supply Order Service returned an empty product plan for supplier [{}]. No order will be created", requestLog.getSupplier().getName());
+            return;
+        }
+
         List<OrderItemDto> items = event.getOrderedQuantities().entrySet().stream()
                 .map(entry -> OrderItemDto.builder().productId(entry.getKey()).quantity(entry.getValue()).build())
                 .toList();

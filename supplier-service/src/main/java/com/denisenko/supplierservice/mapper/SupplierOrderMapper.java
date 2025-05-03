@@ -13,7 +13,7 @@ public interface SupplierOrderMapper extends DtoMapper<SupplierOrderDto, Supplie
 
     @Override
     @Mapping(target = "supplierId", source = "supplier.id")
-    @Mapping(target = "supplierName", ignore = true)
+    @Mapping(target = "supplierName", source = "supplier.name")
     SupplierOrderDto toDTO(SupplierOrder supplierOrder);
 
     @Override
