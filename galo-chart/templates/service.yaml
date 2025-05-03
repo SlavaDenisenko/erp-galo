@@ -1,0 +1,19 @@
+{{- range $name, $service := .Values.services }}
+{{- if $service.enabled -}}
+{{- $global := $.Values.global }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $service.service.name }}
+spec:
+  type: {{ $service.service.type | default $global.service.type }}
+  ports:
+    - name: web
+      port: {{ $service.service.port | default $global.service.port }}
+      targetPort: {{ $service.application.containerPort | default $global.application.containerPort }}
+      protocol: TCP
+  selector:
+    app: {{ $name }}
+---
+{{- end }}
+{{- end }}

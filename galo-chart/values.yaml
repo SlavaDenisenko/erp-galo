@@ -1,0 +1,1327 @@
+global:
+  application:
+    image:
+      pullPolicy: Always
+    containerPort: 8080
+    jpa:
+      hibernate:
+        ddlAuto: validate
+    kafka:
+      bootstrapServers: my-cluster-kafka-bootstrap:9092
+  database:
+    image:
+      repository: postgres
+      tag: "14"
+    containerPort: 5432
+    driverClassName: org.postgresql.Driver
+    accessModes: [ "ReadWriteOnce" ]
+    resources:
+      requests:
+        storage: 1Gi
+    volumeMount:
+      name: postgres-storage
+      mountPath: /var/lib/postgresql/data
+    service:
+      port: 5432
+    migration:
+      image:
+        repository: liquibase/liquibase
+        tag: "4.27.0"
+      volumeMount:
+        name: changelog-volume
+        rootPath: /liquibase
+        mountPath: /changelog/changelog.yaml
+  replicaCount: 1
+  service:
+    name: svc
+    port: 80
+    type: ClusterIP
+
+services:
+  authservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/auth-service
+        tag: "1.1"
+      kafka:
+        enabled: false
+      env:
+        KEYCLOAK_CLIENT_ID: erp-app
+        KEYCLOAK_CLIENT_SECRET: 9uNx6hi8kRf6hAVfbbMiWbgVJ7o8L7k1
+        KEYCLOAK_URL: http://keycloak:8080/realms/erp-galo/protocol/openid-connect/token
+        KEYCLOAK_PUBLIC_KEY: http://keycloak:8080/realms/erp-galo/protocol/openid-connect/certs
+        KEYCLOAK_ISSUER: http://keycloak:8080/realms/erp-galo
+    database:
+      enabled: false
+    replicaCount: 1
+    service:
+      name: svc-auth
+    ingress:
+      enabled: true
+      className: "nginx"
+      hosts:
+        - host: arch.homework
+          paths:
+            - path: /auth/login
+              pathType: Exact
+              definition: POST Authenticate a user and return JWT token
+
+  fiscalservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/fiscal-service
+        tag: "1.1"
+      redis:
+        host: my-redis-master
+        port: 6379
+      kafka:
+        enabled: true
+        groupId: fiscal-service-group
+        topics:
+          - shift-opened
+          - shift-closed
+      env:
+        PRINT_SERVICE_URL: http://svc-print:80
+        PRINT_FISCAL_SHIFT_PATH: /print/fiscal/shift
+        PRINT_FISCAL_ORDER_PATH: /print/fiscal/order
+        PRINT_RETRY_ATTEMPTS: 5
+        PRINT_RETRY_DELAY: 1000
+        OFD_SERVICE_URL: http://svc-ofd-emulator:80
+        OFD_OPEN_SHIFT_PATH: /ofd/shift/open
+        OFD_CLOSE_SHIFT_PATH: /ofd/shift/close
+        OFD_CLOSE_ORDER_PATH: /ofd/order/close
+        OFD_RETRY_ATTEMPTS: 5
+        OFD_RETRY_DELAY: 1000
+        SCHEMA_REGISTRY_URL: http://schema-registry:8080/apis/registry/v2
+    database:
+      enabled: false
+    replicaCount: 1
+    service:
+      name: svc-fiscal
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/use-regex: "true"
+        nginx.ingress.kubernetes.io/auth-url: "{{ printf \"http://%s.%s.svc.cluster.local:%d/auth/verify\" .Values.services.authservice.service.name .Release.Namespace (int (.Values.services.authservice.service.port | default .Values.global.service.port)) }}"
+        nginx.ingress.kubernetes.io/auth-response-headers: "X-User, X-User-Role"
+        nginx.ingress.kubernetes.io/auth-request-set-header: |
+          X-Original-Method $request_method
+      hosts:
+        - host: arch.homework
+          paths:
+            - path: /fiscal/shift/open
+              pathType: Exact
+              definition: POST Open a new shift session for fiscal tracking
+            - path: /fiscal/shift/close
+              pathType: Exact
+              definition: POST Close the current shift and finalize fiscal data
+            - path: /reports
+              pathType: Exact
+              definition: GET Retrieve a list of reports generated during the shift
+#            - path: /reports/([^/]+)
+#              pathType: ImplementationSpecific
+#              definition: GET Retrieve a specific report by its name
+
+  inventoryservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/inventory-service
+        tag: "1.1"
+      redis:
+        host: my-redis-master
+        port: 6379
+      kafka:
+        enabled: true
+        groupId: inventory-service-group
+        topics:
+          - recipe-updated
+          - recipe-deleted
+          - category-updated
+          - category-deleted
+          - supply-order-request
+          - supply-order-response
+          - supply-received
+          - order-closed
+      env:
+        SCHEMA_REGISTRY_URL: http://schema-registry:8080/apis/registry/v2
+    database:
+      enabled: true
+      name: db-inventory
+      username: postgres-inventory
+      password: password-inventory
+      service:
+        name: svc-db-inventory
+      migration:
+        changelog: |
+          databaseChangeLog:
+          - changeSet:
+              id: 1
+              author: Vyacheslav Denisenko
+              changes:
+                - createTable:
+                    tableName: t_category
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: name
+                          type: varchar(255)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: description
+                          type: varchar(500)
+                      - column:
+                          name: category_type
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: created_at
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: updated_at
+                          type: timestamp(0)
+                      - column:
+                          name: parent_category_id
+                          type: int
+                          constraints:
+                            foreignKeyName: fk_parent_category
+                            referencedTableName: t_category
+                            referencedColumnNames: id
+                - createTable:
+                    tableName: t_document
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: document_number
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: document_date
+                          type: date
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: document_type
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: supplier_name
+                          type: varchar
+                - createTable:
+                    tableName: t_ingredient
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                            unique: true
+                      - column:
+                          name: category_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_ingredient_category
+                            referencedTableName: t_category
+                            referencedColumnNames: id
+                      - column:
+                          name: unit_of_measure
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: reorder_level
+                          type: double precision
+                      - column:
+                          name: cost
+                          type: numeric(12,2)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: status
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: created_at
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: updated_at
+                          type: timestamp(0)
+                - createTable:
+                    tableName: t_inventory_movement
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: ingredient_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_inventory_movement_ingredient
+                            referencedTableName: t_ingredient
+                            referencedColumnNames: id
+                      - column:
+                          name: quantity_moved
+                          type: double precision
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: cost
+                          type: numeric(12,2)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: movement_type
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: movement_date
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: associated_document_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_inventory_movement_document
+                            referencedTableName: t_document
+                            referencedColumnNames: id
+                      - column:
+                          name: created_at
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_inventory_snapshot
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: ingredient_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_inventory_snapshot_ingredient
+                            referencedTableName: t_ingredient
+                            referencedColumnNames: id
+                      - column:
+                          name: stock
+                          type: double precision
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: snapshot_date
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_recipe
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                            unique: true
+                      - column:
+                          name: description
+                          type: varchar(500)
+                      - column:
+                          name: category_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_recipe_category
+                            referencedTableName: t_category
+                            referencedColumnNames: id
+                      - column:
+                          name: preparation_time
+                          type: int
+                      - column:
+                          name: price
+                          type: numeric(12,2)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: cost
+                          type: numeric(12,2)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: instructions
+                          type: varchar(2000)
+                      - column:
+                          name: created_at
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: updated_at
+                          type: timestamp(0)
+                      - column:
+                          name: location
+                          type: varchar
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_recipe_composition
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: recipe_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_recipe_composition_recipe
+                            referencedTableName: t_recipe
+                            referencedColumnNames: id
+                      - column:
+                          name: ingredient_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_recipe_composition_ingredient
+                            referencedTableName: t_ingredient
+                            referencedColumnNames: id
+                      - column:
+                          name: quantity
+                          type: double precision
+                          constraints:
+                            nullable: false
+    replicaCount: 1
+    service:
+      name: svc-inventory
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/use-regex: "true"
+        nginx.ingress.kubernetes.io/auth-url: "{{ printf \"http://%s.%s.svc.cluster.local:%d/auth/verify\" .Values.services.authservice.service.name .Release.Namespace (int (.Values.services.authservice.service.port | default .Values.global.service.port)) }}"
+        nginx.ingress.kubernetes.io/auth-response-headers: "X-User, X-User-Role"
+        nginx.ingress.kubernetes.io/auth-request-set-header: |
+          X-Original-Method $request_method
+      hosts:
+        - host: arch.homework
+          paths:
+            - path: /categories
+              pathType: Exact
+              definition: GET Retrieve all categories; POST Create a new category
+            - path: /categories/([^/]+)
+              pathType: ImplementationSpecific
+              definition: PUT Update a specific category by ID; DELETE Delete a specific category by ID
+            - path: /documents
+              pathType: Exact
+              definition: GET Retrieve all documents; POST Create a new document
+            - path: /documents/([^/]+)
+              pathType: ImplementationSpecific
+              definition: GET Get a specific document by ID
+            - path: /ingredients
+              pathType: Exact
+              definition: GET Retrieve all ingredients; POST Create a new ingredient
+            - path: /ingredients/([^/]+)
+              pathType: ImplementationSpecific
+              definition: GET Get a specific ingredient by ID; PUT Update a specific ingredient by ID
+            - path: /recipes
+              pathType: Exact
+              definition: GET Retrieve all recipes; POST Create a new recipe
+            - path: /recipes/([^/]+)
+              pathType: ImplementationSpecific
+              definition: GET Get a specific recipe by ID; PUT Update a specific recipe by ID; DELETE Delete a specific recipe by ID
+            - path: /inventory
+              pathType: Exact
+              definition: POST Retrieve inventory data by ingredient IDs
+            - path: /inventory/snapshot
+              pathType: Exact
+              definition: POST Create a snapshot of inventory for specified ingredients
+
+  ofdemulatorservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/ofd-emulator-service
+        tag: "1.1"
+      kafka:
+        enabled: false
+    database:
+      enabled: false
+    replicaCount: 1
+    service:
+      name: svc-ofd-emulator
+    ingress:
+      enabled: false
+
+  orderservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/order-service
+        tag: "1.1"
+      redis:
+        host: my-redis-master
+        port: 6379
+      kafka:
+        enabled: true
+        groupId: order-service-group
+        topics:
+          - recipe-updated
+          - recipe-deleted
+          - category-updated
+          - category-deleted
+          - order-closed
+      env:
+        PRINT_SERVICE_URL: http://svc-print:80
+        FISCAL_SERVICE_URL: http://svc-fiscal:80
+        INVENTORY_SERVICE_URL: http://svc-inventory:80
+        FEIGN_RETRY_MAX_ATTEMPTS: 5
+        FEIGN_RETRY_DELAY: 10000
+        SCHEMA_REGISTRY_URL: http://schema-registry:8080/apis/registry/v2
+    database:
+      enabled: false
+    replicaCount: 1
+    service:
+      name: svc-order
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/use-regex: "true"
+        nginx.ingress.kubernetes.io/auth-url: "{{ printf \"http://%s.%s.svc.cluster.local:%d/auth/verify\" .Values.services.authservice.service.name .Release.Namespace (int (.Values.services.authservice.service.port | default .Values.global.service.port)) }}"
+        nginx.ingress.kubernetes.io/auth-response-headers: "X-User, X-User-Role"
+        nginx.ingress.kubernetes.io/auth-request-set-header: |
+          X-Original-Method $request_method
+      hosts:
+        - host: arch.homework
+          paths:
+            - path: /menu
+              pathType: Exact
+              definition: GET Retrieve the current menu with all categories and recipes
+            - path: /orders
+              pathType: Exact
+              definition: GET Retrieve all active orders; POST Create a new order
+            - path: /orders/([^/]+)
+              pathType: ImplementationSpecific
+              definition: GET Retrieve a specific order by ID
+            - path: /orders/([^/]+)/close
+              pathType: ImplementationSpecific
+              definition: POST Close an order by ID and process payment
+            - path: /orders/([^/]+)/check
+              pathType: ImplementationSpecific
+              definition: POST Print a pre-check receipt for a specific order
+            - path: /orders/closed
+              pathType: Exact
+              definition: GET Retrieve all closed orders for the current shift
+            - path: /orders/([^/]+)/items
+              pathType: ImplementationSpecific
+              definition: POST Add new items to the specified order; DELETE Remove one or more items from the order with a reason
+
+  printemulatorservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/print-emulator-service
+        tag: "1.1"
+      kafka:
+        enabled: false
+    database:
+      enabled: false
+    replicaCount: 1
+    service:
+      name: svc-print-emulator
+    ingress:
+      enabled: false
+
+  printservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/print-service
+        tag: "1.1"
+      kafka:
+        enabled: false
+      env:
+        PRINT_EMULATOR_URL: http://svc-print-emulator:80/printer/print
+    database:
+      enabled: false
+    replicaCount: 1
+    service:
+      name: svc-print
+    ingress:
+      enabled: false
+
+  reportservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/report-service
+        tag: "1.1"
+      redis:
+        host: my-redis-master
+        port: 6379
+      kafka:
+        enabled: true
+        groupId: report-service-group
+        topics:
+          - shift-opened
+          - shift-closed
+          - order-closed
+      env:
+        SCHEMA_REGISTRY_URL: http://schema-registry:8080/apis/registry/v2
+    database:
+      enabled: true
+      name: db-report
+      username: postgres-report
+      password: password-report
+      service:
+        name: svc-db-report
+      migration:
+        changelog: |
+          databaseChangeLog:
+          - changeSet:
+              id: 1
+              author: Vyacheslav Denisenko
+              changes:
+                - createTable:
+                    tableName: t_shift
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: ofd_shift_number
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: start_time
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: end_time
+                          type: timestamp(0)
+                      - column:
+                          name: opened_by
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: closed_by
+                          type: varchar
+                - createTable:
+                    tableName: t_sale
+                    columns:
+                      - column:
+                          name: id
+                          type: bigint
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: table_number
+                          type: double precision
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: number_of_guests
+                          type: int
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: created_at
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: closed_at
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: total_price
+                          type: numeric(12,2)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: waiter_name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: payment_method
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: shift_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_sale_shift
+                            referencedTableName: t_shift
+                            referencedColumnNames: id
+                - createTable:
+                    tableName: t_sale_item
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: item_id
+                          type: int
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: item_name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: price
+                          type: numeric(12,2)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: quantity
+                          type: double precision
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: course
+                          type: int
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: status
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: reason_for_deletion
+                          type: varchar
+                      - column:
+                          name: sale_id
+                          type: bigint
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_sale_item_sale
+                            referencedTableName: t_sale
+                            referencedColumnNames: id
+                - createTable:
+                    tableName: t_report_template
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: template_name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: created_at
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: is_default
+                          type: boolean
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_template_filter
+                    columns:
+                      - column:
+                          name: template_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_template_filter_report_template
+                            referencedTableName: t_report_template
+                            referencedColumnNames: id
+                      - column:
+                          name: field
+                          type: varchar
+                      - column:
+                          name: operator
+                          type: varchar
+                      - column:
+                          name: value
+                          type: varchar
+                - createTable:
+                    tableName: t_template_aggregation
+                    columns:
+                      - column:
+                          name: template_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_template_aggregation_report_template
+                            referencedTableName: t_report_template
+                            referencedColumnNames: id
+                      - column:
+                          name: field
+                          type: varchar
+                      - column:
+                          name: operation
+                          type: varchar
+    replicaCount: 1
+    service:
+      name: svc-report
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/use-regex: "true"
+        nginx.ingress.kubernetes.io/auth-url: "{{ printf \"http://%s.%s.svc.cluster.local:%d/auth/verify\" .Values.services.authservice.service.name .Release.Namespace (int (.Values.services.authservice.service.port | default .Values.global.service.port)) }}"
+        nginx.ingress.kubernetes.io/auth-response-headers: "X-User, X-User-Role"
+        nginx.ingress.kubernetes.io/auth-request-set-header: |
+          X-Original-Method $request_method
+      hosts:
+        - host: arch.homework
+          paths:
+            - path: /reports/templates
+              pathType: Exact
+              definition: GET Retrieve all report templates; POST Create a new report template
+            - path: /reports
+              pathType: Exact
+              definition: POST Generate a report based on filters or a saved template
+
+  supplieremulatorservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/supplier-emulator-service
+        tag: "1.1"
+      kafka:
+        enabled: false
+      env:
+        SUPPLIER_SERVICE_URL: http://svc-supplier:80
+        RECEIVE_SUPPLY_PATH: /supplies/receive
+    database:
+      enabled: false
+    replicaCount: 1
+    service:
+      name: svc-supplier-emulator
+    ingress:
+      enabled: true
+      className: "nginx"
+      hosts:
+        - host: arch.homework
+          paths:
+            - path: /supply/send
+              pathType: Exact
+              definition: POST Send supply to supplier service
+
+  supplierservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/supplier-service
+        tag: "1.1"
+      redis:
+        host: my-redis-master
+        port: 6379
+      kafka:
+        enabled: true
+        groupId: supplier-service-group
+        topics:
+          - supply-request
+          - supply-response
+          - supply-received
+      env:
+        SCHEMA_REGISTRY_URL: http://schema-registry:8080/apis/registry/v2
+        SUPPLIER_SCHEDULER_CRON: "0 0 6 * * ?"
+        SUPPLIER_INITIAL_DELAY: 300000
+        SUPPLIER_FIXED_RATE: 864000
+    database:
+      enabled: true
+      name: db-supplier
+      username: postgres-supplier
+      password: password-supplier
+      service:
+        name: svc-db-supplier
+      migration:
+        changelog: |
+          databaseChangeLog:
+          - changeSet:
+              id: 1
+              author: Vyacheslav Denisenko
+              changes:
+                - createTable:
+                    tableName: t_supplier
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: description
+                          type: varchar(500)
+                      - column:
+                          name: phone_number
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: status
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: api_url
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: api_type
+                          type: varchar
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_supplier_delivery_day
+                    columns:
+                      - column:
+                          name: supplier_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_supplier_delivery_day_supplier
+                            referencedTableName: t_supplier
+                            referencedColumnNames: id
+                      - column:
+                          name: delivery_day
+                          type: varchar
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_supplier_api_method
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: supplier_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_supplier_api_method_supplier
+                            referencedTableName: t_supplier
+                            referencedColumnNames: id
+                      - column:
+                          name: action_name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: http_method
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: path
+                          type: varchar
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_mapped_product
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: supplier_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_mapped_product_supplier
+                            referencedTableName: t_supplier
+                            referencedColumnNames: id
+                      - column:
+                          name: supplier_product_id
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: supplier_product_name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: inventory_product_id
+                          type: int
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: inventory_product_name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_supplier_order
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: supplier_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_supplier_order_supplier
+                            referencedTableName: t_supplier
+                            referencedColumnNames: id
+                      - column:
+                          name: status
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: supplier_order_id
+                          type: varchar
+                      - column:
+                          name: created_at
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_order_item
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: product_id
+                          type: int
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: product_name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: order_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_order_item_supplier_order
+                            referencedTableName: t_supplier_order
+                            referencedColumnNames: id
+                      - column:
+                          name: quantity
+                          type: double precision
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: unit_of_measure
+                          type: varchar
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_supply
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: supplier_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_supply_supplier
+                            referencedTableName: t_supplier
+                            referencedColumnNames: id
+                      - column:
+                          name: number
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: status
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: supply_date
+                          type: date
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_supply_item
+                    columns:
+                      - column:
+                          name: id
+                          type: int
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: product_id
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: product_name
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: supply_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_supply_item_supply
+                            referencedTableName: t_supply
+                            referencedColumnNames: id
+                      - column:
+                          name: quantity
+                          type: double precision
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: cost
+                          type: numeric(12,2)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: unit_of_measure
+                          type: varchar
+                          constraints:
+                            nullable: false
+                - createTable:
+                    tableName: t_request_log
+                    columns:
+                      - column:
+                          name: id
+                          type: bigint
+                          autoIncrement: true
+                          constraints:
+                            primaryKey: true
+                      - column:
+                          name: request_id
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: supplier_id
+                          type: int
+                          constraints:
+                            nullable: false
+                            foreignKeyName: fk_request_log_supplier
+                            referencedTableName: t_supplier
+                            referencedColumnNames: id
+                      - column:
+                          name: status
+                          type: varchar
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: created_at
+                          type: timestamp(0)
+                          constraints:
+                            nullable: false
+                      - column:
+                          name: updated_at
+                          type: timestamp(0)
+    replicaCount: 1
+    service:
+      name: svc-supplier
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/use-regex: "true"
+        nginx.ingress.kubernetes.io/auth-url: "{{ printf \"http://%s.%s.svc.cluster.local:%d/auth/verify\" .Values.services.authservice.service.name .Release.Namespace (int (.Values.services.authservice.service.port | default .Values.global.service.port)) }}"
+        nginx.ingress.kubernetes.io/auth-response-headers: "X-User, X-User-Role"
+        nginx.ingress.kubernetes.io/auth-request-set-header: |
+          X-Original-Method $request_method
+      hosts:
+        - host: arch.homework
+          paths:
+            - path: /mappings
+              pathType: Exact
+              definition: POST Create mappings between system and supplier ingredient identifiers
+            - path: /suppliers/orders
+              pathType: Exact
+              definition: GET Retrieve all supplier orders; POST Create a new supplier order
+            - path: /suppliers/orders/([^/]+)
+              pathType: ImplementationSpecific
+              definition: GET Retrieve a specific supplier order by ID; PUT Update an existing supplier order
+            - path: /suppliers/orders/([^/]+)/send
+              pathType: ImplementationSpecific
+              definition: POST Send a specific supplier order to the supplier
+            - path: /suppliers
+              pathType: Exact
+              definition: GET Retrieve all suppliers; POST Create a new supplier
+            - path: /suppliers/([^/]+)
+              pathType: ImplementationSpecific
+              definition: GET Retrieve a specific supplier by ID; PUT Update an existing supplier
+            - path: /supplies
+              pathType: Exact
+              definition: GET Retrieve all supplies
+            - path: /supplies/([^/]+)
+              pathType: ImplementationSpecific
+              definition: GET Retrieve a specific supply by ID
+            - path: /supplies/([^/]+)/accept
+              pathType: ImplementationSpecific
+              definition: POST Accept a specific delivery order by ID
+
+  supplyorderservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/supply-order-service
+        tag: "1.1"
+      kafka:
+        enabled: true
+        groupId: supply-order-service-group
+        topics:
+          - supply-order-request
+          - supply-order-response
+          - supply-request
+          - supply-response
+      env:
+        SCHEMA_REGISTRY_URL: http://schema-registry:8080/apis/registry/v2
+    database:
+      enabled: false
+    replicaCount: 1
+    service:
+      name: svc-supply-order
+    ingress:
+      enabled: false
+
+  userservice:
+    enabled: true
+    application:
+      image:
+        repository: sdenisenko/user-service
+        tag: "1.1"
+      redis:
+        host: my-redis-master
+        port: 6379
+      kafka:
+        enabled: false
+      env:
+        KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/erp-galo
+        KEYCLOAK_AUTH_SERVICE_URL: http://keycloak:8080
+        KEYCLOAK_REALM: erp-galo
+        KEYCLOAK_SECRET: 9uNx6hi8kRf6hAVfbbMiWbgVJ7o8L7k1
+        KEYCLOAK_CLIENT_ID: erp-app
+    database:
+      enabled: false
+    replicaCount: 1
+    service:
+      name: svc-user
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/use-regex: "true"
+        nginx.ingress.kubernetes.io/auth-url: "{{ printf \"http://%s.%s.svc.cluster.local:%d/auth/verify\" .Values.services.authservice.service.name .Release.Namespace (int (.Values.services.authservice.service.port | default .Values.global.service.port)) }}"
+        nginx.ingress.kubernetes.io/auth-response-headers: "X-User, X-User-Role"
+        nginx.ingress.kubernetes.io/auth-request-set-header: |
+          X-Original-Method $request_method
+      hosts:
+        - host: arch.homework
+          paths:
+            - path: /roles
+              pathType: Exact
+              definition: GET Retrieve a list of all roles; POST Create a new user role
+            - path: /roles/([^/]+)
+              pathType: ImplementationSpecific
+              definition: PUT Update an existing user role; DELETE Delete a user role by ID
+            - path: /users
+              pathType: Exact
+              definition: GET Retrieve a list of all users; POST Create a new user with basic profile information
+            - path: /users/([^/]+)
+              pathType: ImplementationSpecific
+              definition: PUT Update an existing user; DELETE Delete user by ID
+            - path: /user-roles/([^/]+)/assign/([^/]+)
+              pathType: ImplementationSpecific
+              definition: POST Assign role to a specific user
+            - path: /user-roles/([^/]+)/remove/([^/]+)
+              pathType: ImplementationSpecific
+              definition: DELETE Remove a role from a specific user
+
+nameOverride: "galo"
+fullnameOverride: "erp-galo"

@@ -1,0 +1,19 @@
+{{- range $name, $service := .Values.services }}
+{{- if $service.enabled -}}
+{{- if $service.database.enabled -}}
+{{- $global := $.Values.global }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $service.database.service.name }}
+spec:
+  selector:
+    app: {{ $name }}-statefulset
+  ports:
+    - protocol: TCP
+      port: {{ $service.database.service.port | default $global.database.service.port }}
+      targetPort: {{ $service.database.containerPort | default $global.database.containerPort }}
+---
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,93 @@
+{{- $root := . -}}
+{{- range $name, $service := .Values.services }}
+{{- if $service.enabled -}}
+{{- $global := $.Values.global }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-deployment
+  labels:
+    {{- include "galo.labels" $root | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
+spec:
+  replicas: {{ $service.replicaCount | default $global.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "galo.selectorLabels" $root | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        {{- include "galo.labels" $root | nindent 8 }}
+        {{- with $service.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: {{ include "applicationImage" $service }}
+          imagePullPolicy: {{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "application" "image" "pullPolicy")) }}
+          ports:
+            - name: http
+              containerPort: {{ $service.application.containerPort | default $root.Values.global.application.containerPort }}
+              protocol: TCP
+          env:
+            - name: SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $name }}-configmap
+                  key: SERVER_PORT
+            {{- if $service.database.enabled }}
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-secret
+                  key: DB_URL
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-secret
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-secret
+                  key: DB_PASSWORD
+            - name: DB_DRIVER_CLASS_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-secret
+                  key: DB_DRIVER_CLASS_NAME
+            - name: JPA_GENERATION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-secret
+                  key: JPA_GENERATION
+            {{- end }}
+            {{- if $service.application.kafka.enabled }}
+            {{- range $service.application.kafka.topics }}
+            - name: KAFKA_TOPIC_{{ . | upper | replace "-" "_" }}
+              value: "{{ . }}"
+            {{- end }}
+            - name: KAFKA_GROUP_ID
+              value: {{ $service.application.kafka.groupId }}
+            - name: BOOTSTRAP_SERVERS
+              value: {{ $service.application.kafka.bootstrapServers | default $root.Values.global.application.kafka.bootstrapServers }}
+            {{- end }}
+            {{- if $service.application.redis }}
+            - name: REDIS_HOST
+              value: {{ $service.application.redis.host }}
+            - name: REDIS_PORT
+              value: {{ $service.application.redis.port | quote }}
+            {{- end }}
+            {{- with $service.application.env }}
+            {{- range $key, $value := . }}
+            - name: {{ $key | quote }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+---
+{{- end }}
+{{- end }}

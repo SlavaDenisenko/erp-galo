@@ -1,0 +1,63 @@
+{{- range $name, $service := .Values.services }}
+{{- if $service.enabled -}}
+{{- if $service.database.enabled -}}
+{{- $global := $.Values.global }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-job
+  annotations:
+    "helm.sh/hook": post-install, post-upgrade
+    "helm.sh/hook-weight": "0"
+spec:
+  template:
+    metadata:
+      name: database-migration
+    spec:
+      initContainers:
+        - name: init-db-check
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for PostgreSQL to be ready...";
+              until nc -z {{ $service.database.service.name }} {{ $service.database.service.port | default $global.database.service.port }}; do
+                echo "Billing database not ready yet, waiting...";
+                sleep 5;
+              done;
+      containers:
+        - name: database-migration
+          image: {{ include "migrationImage" $global }}
+          env:
+            - name: LIQUIBASE_COMMAND_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-secret
+                  key: DB_URL
+            - name: LIQUIBASE_COMMAND_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-secret
+                  key: DB_USERNAME
+            - name: LIQUIBASE_COMMAND_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-secret
+                  key: DB_PASSWORD
+            - name: LIQUIBASE_COMMAND_CHANGELOG_FILE
+              value: {{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "database" "migration" "volumeMount" "mountPath")) }}
+          volumeMounts:
+            - name: {{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "database" "migration" "volumeMount" "name")) }}
+              mountPath: {{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "database" "migration" "volumeMount" "rootPath")) }}{{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "database" "migration" "volumeMount" "mountPath")) }}
+              subPath: CHANGELOG
+          command: [ "liquibase", "update", "--log-level=DEBUG" ]
+      restartPolicy: OnFailure
+      volumes:
+        - name: {{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "database" "migration" "volumeMount" "name")) }}
+          configMap:
+            name: {{ $name }}-configmap
+---
+{{- end }}
+{{- end }}
+{{- end }}

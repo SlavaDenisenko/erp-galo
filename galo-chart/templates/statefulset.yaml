@@ -1,0 +1,55 @@
+{{- range $name, $service := .Values.services }}
+{{- if $service.enabled -}}
+{{- if $service.database.enabled -}}
+{{- $global := $.Values.global }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}-statefulset
+spec:
+  serviceName: {{ $service.database.service.name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $name }}-statefulset
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}-statefulset
+    spec:
+      containers:
+          - name: postgres
+            image: {{ include "databaseImage" (dict "local" $service "global" $global) }}
+            ports:
+              - containerPort: {{ $service.database.containerPort | default $global.database.containerPort }}
+            env:
+              - name: POSTGRES_DB
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $name }}-secret
+                    key: DB_NAME
+              - name: POSTGRES_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $name }}-secret
+                    key: DB_USERNAME
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $name }}-secret
+                    key: DB_PASSWORD
+            volumeMounts:
+              - name: {{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "database" "volumeMount" "name")) }}
+                mountPath: {{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "database" "volumeMount" "mountPath")) }}
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "database" "volumeMount" "name")) }}
+      spec:
+        accessModes: {{ $service.database.accessModes | default $global.database.accessModes }}
+        resources:
+          requests:
+            storage: {{ include "getOrDefault" (dict "local" $service "global" $global "path" (list "database" "resources" "requests" "storage")) }}
+---
+{{- end }}
+{{- end }}
+{{- end }}
