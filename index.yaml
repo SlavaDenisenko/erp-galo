@@ -1,0 +1,35 @@
+apiVersion: v1
+entries:
+  galo-chart:
+  - apiVersion: v2
+    created: "2025-05-03T17:25:49.2526618+03:00"
+    description: A Helm chart for Kubernetes
+    digest: 7ce00627d27212f0ac1c25c82455a4158bf3e75ced7dc21329685d28a3b48fbb
+    name: galo-chart
+    type: application
+    urls:
+    - https://slavadenisenko.github.io/erp-galo/galo-chart-1.0.0.tgz
+    version: 1.0.0
+  keycloak:
+  - apiVersion: v2
+    appVersion: 25.0.0
+    created: "2025-05-03T17:25:49.2532236+03:00"
+    description: Keycloak with imported realm
+    digest: 903faf23bf1e37ebc627f69b25a3a57b41925bc5444cf73c34ea73c9e0c7508b
+    name: keycloak
+    type: application
+    urls:
+    - https://slavadenisenko.github.io/erp-galo/keycloak-0.1.0.tgz
+    version: 0.1.0
+  schema-registry:
+  - apiVersion: v2
+    appVersion: 2.6.2.Final
+    created: "2025-05-03T17:25:49.2532236+03:00"
+    description: A Helm chart for Schema Registry
+    digest: 7295670d602b47e160343124fb997b3485d535e9462386f4f46f82174d1108a6
+    name: schema-registry
+    type: application
+    urls:
+    - https://slavadenisenko.github.io/erp-galo/schema-registry-0.1.0.tgz
+    version: 0.1.0
+generated: "2025-05-03T17:25:49.2510484+03:00"
