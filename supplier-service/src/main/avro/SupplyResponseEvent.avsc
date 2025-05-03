@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "SupplyResponseEvent",
+  "namespace": "com.denisenko.events",
+  "fields": [
+    {
+      "name": "requestId",
+      "type": "string"
+    },
+    {
+      "name": "orderedQuantities",
+      "type": {
+        "type": "map",
+        "values": "double"
+      }
+    }
+  ]
+}
