@@ -1,0 +1,45 @@
+spring:
+  kafka:
+    bootstrap-servers: ${BOOTSTRAP_SERVERS}
+    topics:
+      supply-order-request: ${KAFKA_TOPIC_SUPPLY_ORDER_REQUEST}
+      supply-order-response: ${KAFKA_TOPIC_SUPPLY_ORDER_RESPONSE}
+      supply-request: ${KAFKA_TOPIC_SUPPLY_REQUEST}
+      supply-response: ${KAFKA_TOPIC_SUPPLY_RESPONSE}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.apicurio.registry.serde.avro.AvroKafkaSerializer
+      properties:
+        apicurio.registry.url: ${SCHEMA_REGISTRY_URL}
+        apicurio.registry.auto-register: true
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: io.apicurio.registry.serde.avro.AvroKafkaDeserializer
+      group-id: ${KAFKA_GROUP_ID}
+      properties:
+        apicurio.registry.url: ${SCHEMA_REGISTRY_URL}
+        apicurio.registry.auto-register: true
+        apicurio.registry.use-specific-avro-reader: true
+        spring:
+          json:
+            trusted:
+              packages: "*"
+        auto-offset-reset: earliest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true # /actuator/health/liveness
+    readinessstate:
+      enabled: true # /actuator/health/readiness
+
+supply-order:
+  planner-strategy: threshold
