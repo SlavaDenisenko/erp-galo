@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: schema-registry
+  labels:
+    {{- include "schema-registry-chart.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+  selector:
+    {{- include "schema-registry-chart.selectorLabels" . | nindent 4 }}
