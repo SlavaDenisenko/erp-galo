@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-config
+data:
+  galo-realm.json: |-
+    {{ .Files.Get "realms/galo-realm.json" | nindent 4 }}

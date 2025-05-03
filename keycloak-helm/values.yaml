@@ -1,0 +1,6 @@
+keycloak:
+  adminUser: admin
+  adminPassword: admin123
+
+service:
+  port: 8080
