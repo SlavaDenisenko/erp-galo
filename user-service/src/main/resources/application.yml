@@ -1,0 +1,50 @@
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      timeout: 60000
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 1
+          max-wait: 2000ms
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
+          jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/protocol/openid-connect/certs
+
+keycloak:
+  auth-server-url: ${KEYCLOAK_AUTH_SERVICE_URL}
+  realm: ${KEYCLOAK_REALM}
+  resource: ${KEYCLOAK_CLIENT_ID}
+  credentials:
+    secret: ${KEYCLOAK_SECRET}
+
+jwt:
+  auth:
+    converter:
+      resourceId: ${KEYCLOAK_CLIENT_ID}
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    com.denisenko.userservice.config.jwt.JwtAuthConverter: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true # /actuator/health/liveness
+    readinessstate:
+      enabled: true # /actuator/health/readiness
